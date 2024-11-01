@@ -2,11 +2,11 @@ package repositories
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/robzlabz/db-backup/internal/core/domain"
 	"github.com/robzlabz/db-backup/internal/core/ports"
+	"github.com/robzlabz/db-backup/pkg/logging"
 )
 
 type SQLiteRepository struct {
@@ -29,7 +29,7 @@ func (r *SQLiteRepository) SaveConfig(config domain.BackupConfig) error {
 	`
 	_, err := r.db.NamedExec(query, config)
 	if err != nil {
-		log.Printf("[Repository][SQLiteRepository][SaveConfig] Error: %v", err)
+		logging.Errorf("[Repository][SQLiteRepository][SaveConfig] Error: %v", err)
 		return err
 	}
 
@@ -45,7 +45,7 @@ func (r *SQLiteRepository) GetAllConfigs() ([]domain.BackupConfig, error) {
 	`
 	err := r.db.Select(&configs, query)
 	if err != nil {
-		log.Printf("[Repository][SQLiteRepository][GetAllConfigs] Error: %v", err)
+		logging.Errorf("[Repository][SQLiteRepository][GetAllConfigs] Error: %v", err)
 		return nil, err
 	}
 
@@ -56,32 +56,7 @@ func (r *SQLiteRepository) UpdateLastBackup(id int, timestamp int64) error {
 	query := `UPDATE backup_configs SET last_backup = ? WHERE id = ?`
 	_, err := r.db.Exec(query, timestamp, id)
 	if err != nil {
-		log.Printf("[Repository][SQLiteRepository][UpdateLastBackup] Error: %v", err)
-		return err
-	}
-
-	return nil
-}
-
-// InitDB membuat tabel jika belum ada
-func (r *SQLiteRepository) InitDB() error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS backup_configs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		type TEXT NOT NULL,
-		host TEXT NOT NULL,
-		port INTEGER NOT NULL,
-		database TEXT NOT NULL,
-		username TEXT NOT NULL,
-		password TEXT NOT NULL,
-		interval INTEGER NOT NULL,
-		output_path TEXT NOT NULL,
-		last_backup INTEGER DEFAULT 0
-	);`
-
-	_, err := r.db.Exec(schema)
-	if err != nil {
-		log.Printf("[Repository][SQLiteRepository][InitDB] Error: %v", err)
+		logging.Errorf("[Repository][SQLiteRepository][UpdateLastBackup] Error: %v", err)
 		return err
 	}
 
@@ -92,16 +67,19 @@ func (r *SQLiteRepository) Delete(id int) error {
 	query := `DELETE FROM backup_configs WHERE id = ?`
 	result, err := r.db.Exec(query, id)
 	if err != nil {
+		logging.Errorf("[Repository][SQLiteRepository][Delete] Error calling query: %v", err)
 		return err
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
+		logging.Errorf("[Repository][SQLiteRepository][Delete] Error getting rows affected: %v", err)
 		return err
 	}
 
 	if affected == 0 {
-		return fmt.Errorf("no configuration found with ID %s", id)
+		logging.Errorf("[Repository][SQLiteRepository][Delete] No configuration found with ID %d", id)
+		return fmt.Errorf("no configuration found with ID %d", id)
 	}
 
 	return nil

@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -9,6 +8,7 @@ import (
 	"github.com/robzlabz/db-backup/internal/adapters/repositories"
 	"github.com/robzlabz/db-backup/internal/core/ports"
 	"github.com/robzlabz/db-backup/internal/core/services"
+	"github.com/robzlabz/db-backup/pkg/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -17,9 +17,13 @@ var scheduleCmd = &cobra.Command{
 	Short: "Menjalankan backup terjadwal",
 	Long:  `Menjalankan backup database secara otomatis sesuai jadwal yang telah diatur`,
 	Run: func(cmd *cobra.Command, args []string) {
+		logger := logging.Sugar()
+
 		db, err := sqlx.Connect("sqlite3", "./backup.db")
 		if err != nil {
-			log.Fatalf("Gagal membuka database: %v", err)
+			logger.Errorw("[CMD][Schedule][Run] Gagal membuka database",
+				"error", err,
+			)
 		}
 		defer db.Close()
 
@@ -31,8 +35,8 @@ var scheduleCmd = &cobra.Command{
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
-		log.Println("Memulai backup scheduler...")
-		log.Println("Memeriksa backup setiap 1 menit")
+		logger.Infow("[CMD][Schedule][Run] Memulai backup scheduler...")
+		logger.Infow("[CMD][Schedule][Run] Memeriksa backup setiap 1 menit")
 
 		// Jalankan pengecekan pertama kali
 		checkAndExecuteBackups(backupService)
@@ -45,9 +49,13 @@ var scheduleCmd = &cobra.Command{
 }
 
 func checkAndExecuteBackups(backupService ports.BackupService) {
+	logger := logging.Sugar()
+
 	configs, err := backupService.GetAllConfigs()
 	if err != nil {
-		log.Printf("Gagal mengambil konfigurasi: %v", err)
+		logger.Errorw("[CMD][Schedule][checkAndExecuteBackups] Gagal mengambil konfigurasi",
+			"error", err,
+		)
 		return
 	}
 
@@ -57,13 +65,21 @@ func checkAndExecuteBackups(backupService ports.BackupService) {
 		nextBackupTime := lastBackupTime.Add(time.Duration(config.Interval) * time.Minute)
 
 		if now.After(nextBackupTime) {
-			log.Printf("Menjalankan backup untuk database %s (%s)", config.Database, config.Type)
+			logger.Infow("[CMD][Schedule][checkAndExecuteBackups] Menjalankan backup",
+				"database", config.Database,
+				"type", config.Type,
+			)
+
 			if err := backupService.ExecuteBackup(config); err != nil {
-				log.Printf("Gagal backup database %s: %v", config.Database, err)
+				logger.Errorw("[CMD][Schedule][checkAndExecuteBackups] Gagal backup database",
+					"database", config.Database,
+					"error", err,
+				)
 			} else {
-				log.Printf("Berhasil backup database %s", config.Database)
-				log.Printf("Backup berikutnya pada: %s",
-					time.Now().Add(time.Duration(config.Interval)*time.Minute).Format("2006-01-02 15:04:05"))
+				logger.Infow("[CMD][Schedule][checkAndExecuteBackups] Berhasil backup database",
+					"database", config.Database,
+					"next_backup", time.Now().Add(time.Duration(config.Interval)*time.Minute).Format("2006-01-02 15:04:05"),
+				)
 			}
 		}
 	}

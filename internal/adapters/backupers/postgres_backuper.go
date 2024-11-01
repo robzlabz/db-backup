@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/robzlabz/db-backup/internal/core/domain"
+	"github.com/robzlabz/db-backup/pkg/logging"
 )
 
 type PostgresBackuper struct{}
@@ -18,44 +19,73 @@ func NewPostgresBackuper() *PostgresBackuper {
 }
 
 func (b *PostgresBackuper) Backup(config domain.BackupConfig) error {
-	// Mengambil konfigurasi yang diperlukan
-	host := config.Host
-	port := config.Port
-	dbname := config.Database
-	username := config.User
-	password := config.Password
-	backupDir := config.OutputPath
+	logger := logging.Sugar()
+	logger.Infow("Memulai backup PostgreSQL",
+		"database", config.Database,
+		"host", config.Host,
+		"port", config.Port,
+	)
 
 	// Membuat nama file backup dengan timestamp
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
-	filename := fmt.Sprintf("%s_%s.sql", dbname, timestamp)
-	backupPath := filepath.Join(backupDir, filename)
+	filename := fmt.Sprintf("%s_%s.sql", config.Database, timestamp)
+	backupPath := filepath.Join(config.OutputPath, filename)
 
 	// Memastikan direktori backup ada
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(config.OutputPath, 0755); err != nil {
+		logger.Errorw("Gagal membuat direktori backup",
+			"error", err,
+			"path", config.OutputPath,
+		)
 		return fmt.Errorf("gagal membuat direktori backup: %v", err)
 	}
 
+	logger.Debugw("Menyiapkan backup",
+		"output_file", backupPath,
+	)
+
 	// Menyiapkan environment variable untuk password
 	env := os.Environ()
-	env = append(env, fmt.Sprintf("PGPASSWORD=%s", password))
+	env = append(env, fmt.Sprintf("PGPASSWORD=%s", config.Password))
 
 	// Menyiapkan command pg_dump
 	cmd := exec.Command("pg_dump",
-		"-h", host,
-		"-p", strconv.Itoa(port),
-		"-U", username,
-		"-d", dbname,
+		"-h", config.Host,
+		"-p", strconv.Itoa(config.Port),
+		"-U", config.User,
+		"-d", config.Database,
 		"-F", "p", // Format plain text SQL
 		"-f", backupPath,
 	)
 
 	cmd.Env = env
 
+	logger.Debug("Menjalankan pg_dump command")
+
 	// Menjalankan backup
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		logger.Errorw("Gagal menjalankan pg_dump",
+			"error", err,
+			"output", string(output),
+		)
 		return fmt.Errorf("gagal melakukan backup: %v, output: %s", err, string(output))
+	}
+
+	// Get file info untuk ukuran file
+	fileInfo, err := os.Stat(backupPath)
+	if err != nil {
+		logger.Warnw("Gagal mendapatkan informasi file backup",
+			"error", err,
+			"path", backupPath,
+		)
+	} else {
+		logger.Infow("Backup selesai",
+			"database", config.Database,
+			"file", backupPath,
+			"size_bytes", fileInfo.Size(),
+			"duration", time.Since(time.Now()),
+		)
 	}
 
 	return nil

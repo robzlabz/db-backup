@@ -3,13 +3,13 @@ package backupers
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/robzlabz/db-backup/internal/core/domain"
+	"github.com/robzlabz/db-backup/pkg/logging"
 )
 
 type mysqlBackuper struct{}
@@ -24,7 +24,7 @@ func (b *mysqlBackuper) Backup(config domain.BackupConfig) error {
 		host = "127.0.0.1"
 	}
 
-	log.Printf("[Backuper][MySQLBackuper] Backing up database: %s@%s:%d/%s",
+	logging.Infof("[Backuper][MySQLBackuper] Backing up database: %s@%s:%d/%s",
 		config.User, host, config.Port, config.Database)
 
 	args := []string{
@@ -51,11 +51,11 @@ func (b *mysqlBackuper) Backup(config domain.BackupConfig) error {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("[Backuper][MySQLBackuper][Backup] Error: %v\nOutput: %s", err, string(output))
+		logging.Errorf("[Backuper][MySQLBackuper][Backup] Error: %v\nOutput: %s", err, string(output))
 		return fmt.Errorf("backup error: %v", err)
 	}
 
-	log.Printf("[Backuper][MySQLBackuper][Backup] Backup completed: %s", config.OutputPath)
+	logging.Infof("[Backuper][MySQLBackuper][Backup] Backup completed: %s", config.OutputPath)
 
 	now := time.Now().Format("20240101120000")
 	filename := fmt.Sprintf("%s_%s.sql", config.Database, now)

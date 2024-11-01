@@ -5,6 +5,7 @@ import (
 
 	"github.com/robzlabz/db-backup/internal/core/domain"
 	"github.com/robzlabz/db-backup/internal/core/ports"
+	"github.com/robzlabz/db-backup/pkg/logging"
 )
 
 type backupService struct {
@@ -37,6 +38,7 @@ func (s *backupService) ExecuteBackup(config domain.BackupConfig) error {
 	// Cek apakah sudah waktunya backup
 	now := time.Now().Unix()
 	if now-config.LastBackup < int64(config.Interval*60) {
+		logging.Infof("[Service][BackupService][ExecuteBackup] Belum waktunya backup: %d", now-config.LastBackup)
 		return nil // Belum waktunya backup
 	}
 
@@ -48,9 +50,11 @@ func (s *backupService) ExecuteBackup(config domain.BackupConfig) error {
 	}
 
 	if err != nil {
+		logging.Errorf("[Service][BackupService][ExecuteBackup] Error: %v", err)
 		return err
 	}
 
 	// Update waktu backup terakhir
+	logging.Infof("[Service][BackupService][ExecuteBackup] Update waktu backup terakhir: %d", now)
 	return s.repo.UpdateLastBackup(config.ID, now)
 }

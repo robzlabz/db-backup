@@ -10,6 +10,7 @@ import (
 	"github.com/robzlabz/db-backup/internal/adapters/repositories"
 	"github.com/robzlabz/db-backup/internal/core/domain"
 	"github.com/robzlabz/db-backup/internal/core/services"
+	"github.com/robzlabz/db-backup/pkg/logging"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,7 @@ var addCmd = &cobra.Command{
 	Short: "Menambahkan database baru untuk backup",
 	Long:  `Menambahkan konfigurasi database baru yang akan di-backup secara otomatis`,
 	Run: func(cmd *cobra.Command, args []string) {
+		logger := logging.Sugar()
 		// Pilihan tipe database
 		dbTypePrompt := promptui.Select{
 			Label: "Pilih tipe database",
@@ -67,7 +69,7 @@ var addCmd = &cobra.Command{
 		}
 		dbname, err := dbPrompt.Run()
 		if err != nil {
-			fmt.Printf("Gagal input nama database: %v\n", err)
+			logger.Errorf("Gagal input nama database: %v", err)
 			return
 		}
 
@@ -77,7 +79,7 @@ var addCmd = &cobra.Command{
 		}
 		username, err := userPrompt.Run()
 		if err != nil {
-			fmt.Printf("Gagal input username: %v\n", err)
+			logger.Errorf("Gagal input username: %v", err)
 			return
 		}
 
@@ -88,7 +90,7 @@ var addCmd = &cobra.Command{
 		}
 		password, err := passPrompt.Run()
 		if err != nil {
-			fmt.Printf("Gagal input password: %v\n", err)
+			logger.Errorf("Gagal input password: %v", err)
 			return
 		}
 
@@ -103,7 +105,7 @@ var addCmd = &cobra.Command{
 		}
 		intervalStr, err := intervalPrompt.Run()
 		if err != nil {
-			fmt.Printf("Gagal input interval: %v\n", err)
+			logger.Errorf("Gagal input interval: %v", err)
 			return
 		}
 		interval, _ := strconv.Atoi(intervalStr)
@@ -121,7 +123,7 @@ var addCmd = &cobra.Command{
 
 		db, err := sqlx.Connect("sqlite3", "./backup.db")
 		if err != nil {
-			fmt.Printf("Gagal membuka database: %v\n", err)
+			logger.Errorf("Gagal membuka database: %v", err)
 			return
 		}
 		defer db.Close()
@@ -131,11 +133,11 @@ var addCmd = &cobra.Command{
 		mysqlBackuper := backupers.NewMySQLBackuper()
 		backupService := services.NewBackupService(repo, mysqlBackuper, pgBackuper)
 		if err := backupService.AddConfig(config); err != nil {
-			fmt.Printf("Gagal menyimpan konfigurasi: %v\n", err)
+			logger.Errorf("Gagal menyimpan konfigurasi: %v", err)
 			return
 		}
 
-		fmt.Println("Berhasil menambahkan konfigurasi database!")
+		logger.Infof("Berhasil menambahkan konfigurasi database!")
 	},
 }
 
