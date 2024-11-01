@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/robzlabz/db-backup/internal/core/domain"
@@ -9,43 +8,9 @@ import (
 )
 
 type backupService struct {
-	repository    ports.BackupRepository
+	repo          ports.BackupRepository
 	mysqlBackuper ports.DatabaseBackuper
 	pgBackuper    ports.DatabaseBackuper
-}
-
-func (s *backupService) GetAllBackups() ([]domain.Backup, error) {
-	return s.repository.GetAll()
-}
-
-func (s *backupService) GetBackup(id int64) (*domain.Backup, error) {
-	return s.repository.GetByID(id)
-}
-
-func (s *backupService) CreateBackup(dbType string, config domain.BackupConfig) error {
-	var backuper ports.DatabaseBackuper
-
-	switch dbType {
-	case "mysql":
-		backuper = s.mysqlBackuper
-	case "postgres":
-		backuper = s.pgBackuper
-	default:
-		return fmt.Errorf("unsupported database type: %s", dbType)
-	}
-
-	if err := backuper.Backup(config); err != nil {
-		return err
-	}
-
-	backup := &domain.Backup{
-		DBType:    dbType,
-		DBName:    config.Database,
-		FilePath:  config.OutputPath,
-		CreatedAt: time.Now(),
-	}
-
-	return s.repository.Save(backup)
 }
 
 func NewBackupService(
@@ -54,8 +19,38 @@ func NewBackupService(
 	pgBackuper ports.DatabaseBackuper,
 ) ports.BackupService {
 	return &backupService{
-		repository:    repo,
+		repo:          repo,
 		mysqlBackuper: mysqlBackuper,
 		pgBackuper:    pgBackuper,
 	}
+}
+
+func (s *backupService) AddConfig(config domain.BackupConfig) error {
+	return s.repo.SaveConfig(config)
+}
+
+func (s *backupService) GetAllConfigs() ([]domain.BackupConfig, error) {
+	return s.repo.GetAllConfigs()
+}
+
+func (s *backupService) ExecuteBackup(config domain.BackupConfig) error {
+	// Cek apakah sudah waktunya backup
+	now := time.Now().Unix()
+	if now-config.LastBackup < int64(config.Interval*60) {
+		return nil // Belum waktunya backup
+	}
+
+	var err error
+	if config.Type == "MySQL" {
+		err = s.mysqlBackuper.Backup(config)
+	} else {
+		err = s.pgBackuper.Backup(config)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Update waktu backup terakhir
+	return s.repo.UpdateLastBackup(config.ID, now)
 }

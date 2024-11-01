@@ -12,10 +12,14 @@ type Backup struct {
 }
 
 type BackupConfig struct {
-	Host       string
-	Port       int
-	User       string
-	Password   string
-	Database   string
-	OutputPath string
+	ID         int    `json:"id"`
+	Type       string `json:"type"`
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	Database   string `json:"database"`
+	User       string `json:"user"`
+	Password   string `json:"password"`
+	Interval   int    `json:"interval"`
+	OutputPath string `json:"output_path" db:"output_path"`
+	LastBackup int64  `json:"last_backup" db:"last_backup"`
 }

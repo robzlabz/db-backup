@@ -1,41 +1,87 @@
 package repositories
 
 import (
-	"database/sql"
+	"log"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/robzlabz/db-backup/internal/core/domain"
 )
 
-type sqliteRepository struct {
-	db *sql.DB
+type SQLiteRepository struct {
+	db *sqlx.DB
 }
 
-func NewSQLiteRepository(db *sql.DB) *sqliteRepository {
-	return &sqliteRepository{db: db}
+func NewSQLiteRepository(db *sqlx.DB) *SQLiteRepository {
+	return &SQLiteRepository{db: db}
 }
 
-func (r *sqliteRepository) Save(backup *domain.Backup) error {
-	query := `INSERT INTO backups (db_type, db_name, file_path, size, created_at)
-			  VALUES (?, ?, ?, ?, ?)`
-
-	result, err := r.db.Exec(query,
-		backup.DBType,
-		backup.DBName,
-		backup.FilePath,
-		backup.Size,
-		backup.CreatedAt,
-	)
+func (r *SQLiteRepository) SaveConfig(config domain.BackupConfig) error {
+	query := `
+		INSERT INTO backup_configs (
+			type, host, port, database, username, password,
+			interval, output_path, last_backup
+		) VALUES (
+			:type, :host, :port, :database, :user, :password,
+			:interval, :output_path, :last_backup
+		)
+	`
+	_, err := r.db.NamedExec(query, config)
 	if err != nil {
+		log.Printf("[Repository][SQLiteRepository][SaveConfig] Error: %v", err)
 		return err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-
-	backup.ID = id
 	return nil
 }
 
-// Implementasi method lainnya...
+func (r *SQLiteRepository) GetAllConfigs() ([]domain.BackupConfig, error) {
+	var configs []domain.BackupConfig
+	query := `
+		SELECT id, type, host, port, database, username as user,
+		       password, interval, output_path, last_backup
+		FROM backup_configs
+	`
+	err := r.db.Select(&configs, query)
+	if err != nil {
+		log.Printf("[Repository][SQLiteRepository][GetAllConfigs] Error: %v", err)
+		return nil, err
+	}
+
+	return configs, nil
+}
+
+func (r *SQLiteRepository) UpdateLastBackup(id int, timestamp int64) error {
+	query := `UPDATE backup_configs SET last_backup = ? WHERE id = ?`
+	_, err := r.db.Exec(query, timestamp, id)
+	if err != nil {
+		log.Printf("[Repository][SQLiteRepository][UpdateLastBackup] Error: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// InitDB membuat tabel jika belum ada
+func (r *SQLiteRepository) InitDB() error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS backup_configs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		type TEXT NOT NULL,
+		host TEXT NOT NULL,
+		port INTEGER NOT NULL,
+		database TEXT NOT NULL,
+		username TEXT NOT NULL,
+		password TEXT NOT NULL,
+		interval INTEGER NOT NULL,
+		output_path TEXT NOT NULL,
+		last_backup INTEGER DEFAULT 0
+	);`
+
+	_, err := r.db.Exec(schema)
+	if err != nil {
+		log.Printf("[Repository][SQLiteRepository][InitDB] Error: %v", err)
+		return err
+	}
+
+	return nil
+}

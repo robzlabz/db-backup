@@ -5,7 +5,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"time"
+
+	"github.com/robzlabz/db-backup/internal/core/domain"
 )
 
 type PostgresBackuper struct{}
@@ -14,14 +17,14 @@ func NewPostgresBackuper() *PostgresBackuper {
 	return &PostgresBackuper{}
 }
 
-func (b *PostgresBackuper) Backup(config map[string]string) error {
+func (b *PostgresBackuper) Backup(config domain.BackupConfig) error {
 	// Mengambil konfigurasi yang diperlukan
-	host := config["host"]
-	port := config["port"]
-	dbname := config["dbname"]
-	username := config["username"]
-	password := config["password"]
-	backupDir := config["backup_dir"]
+	host := config.Host
+	port := config.Port
+	dbname := config.Database
+	username := config.User
+	password := config.Password
+	backupDir := config.OutputPath
 
 	// Membuat nama file backup dengan timestamp
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
@@ -40,7 +43,7 @@ func (b *PostgresBackuper) Backup(config map[string]string) error {
 	// Menyiapkan command pg_dump
 	cmd := exec.Command("pg_dump",
 		"-h", host,
-		"-p", port,
+		"-p", strconv.Itoa(port),
 		"-U", username,
 		"-d", dbname,
 		"-F", "p", // Format plain text SQL
