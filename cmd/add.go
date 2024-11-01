@@ -127,11 +127,6 @@ var addCmd = &cobra.Command{
 		defer db.Close()
 
 		repo := repositories.NewSQLiteRepository(db)
-		if err := repo.InitDB(); err != nil {
-			fmt.Printf("Gagal inisialisasi database: %v\n", err)
-			return
-		}
-
 		pgBackuper := backupers.NewPostgresBackuper()
 		mysqlBackuper := backupers.NewMySQLBackuper()
 		backupService := services.NewBackupService(repo, mysqlBackuper, pgBackuper)

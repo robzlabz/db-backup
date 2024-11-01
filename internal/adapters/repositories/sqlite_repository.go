@@ -1,17 +1,19 @@
 package repositories
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/robzlabz/db-backup/internal/core/domain"
+	"github.com/robzlabz/db-backup/internal/core/ports"
 )
 
 type SQLiteRepository struct {
 	db *sqlx.DB
 }
 
-func NewSQLiteRepository(db *sqlx.DB) *SQLiteRepository {
+func NewSQLiteRepository(db *sqlx.DB) ports.BackupRepository {
 	return &SQLiteRepository{db: db}
 }
 
@@ -81,6 +83,25 @@ func (r *SQLiteRepository) InitDB() error {
 	if err != nil {
 		log.Printf("[Repository][SQLiteRepository][InitDB] Error: %v", err)
 		return err
+	}
+
+	return nil
+}
+
+func (r *SQLiteRepository) Delete(id int) error {
+	query := `DELETE FROM backup_configs WHERE id = ?`
+	result, err := r.db.Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if affected == 0 {
+		return fmt.Errorf("no configuration found with ID %s", id)
 	}
 
 	return nil
