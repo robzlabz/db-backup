@@ -1,1 +1,4 @@
 *.db
+backup/
+backup.db
+*.log
