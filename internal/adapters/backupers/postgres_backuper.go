@@ -10,6 +10,7 @@ import (
 
 	"github.com/robzlabz/db-backup/internal/core/domain"
 	"github.com/robzlabz/db-backup/pkg/logging"
+	"github.com/robzlabz/db-backup/pkg/utils"
 )
 
 type PostgresBackuper struct{}
@@ -30,6 +31,7 @@ func (b *PostgresBackuper) Backup(config domain.BackupConfig) error {
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	filename := fmt.Sprintf("%s_%s.sql", config.Database, timestamp)
 	backupPath := filepath.Join(config.OutputPath, filename)
+	zipPath := backupPath + ".zip"
 
 	// Memastikan direktori backup ada
 	if err := os.MkdirAll(config.OutputPath, 0755); err != nil {
@@ -72,17 +74,28 @@ func (b *PostgresBackuper) Backup(config domain.BackupConfig) error {
 		return fmt.Errorf("gagal melakukan backup: %v, output: %s", err, string(output))
 	}
 
+	// Kompresi file backup
+	logger.Debug("Memulai kompresi file backup")
+	if err := utils.CompressFile(backupPath, zipPath); err != nil {
+		logger.Errorw("Gagal mengkompresi file backup",
+			"error", err,
+			"source", backupPath,
+			"destination", zipPath,
+		)
+		return fmt.Errorf("gagal mengkompresi file backup: %v", err)
+	}
+
 	// Get file info untuk ukuran file
-	fileInfo, err := os.Stat(backupPath)
+	fileInfo, err := os.Stat(zipPath)
 	if err != nil {
 		logger.Warnw("Gagal mendapatkan informasi file backup",
 			"error", err,
-			"path", backupPath,
+			"path", zipPath,
 		)
 	} else {
 		logger.Infow("Backup selesai",
 			"database", config.Database,
-			"file", backupPath,
+			"file", zipPath,
 			"size_bytes", fileInfo.Size(),
 			"duration", time.Since(time.Now()),
 		)
